@@ -11,6 +11,7 @@ const project = new awscdk.AwsCdkTypeScriptApp({
     '@aws-sdk/client-sqs',
     '@aws-sdk/lib-dynamodb',
     'aws-sdk-client-mock',
+    'dayjs',
   ],
   // description: undefined,      /* The description is just a string that helps people understand the purpose of the package. */
   // devDeps: [],                 /* Build dependencies for this module. */

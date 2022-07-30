@@ -1,19 +1,27 @@
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { DeleteCommand, DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import axios from 'axios';
+import dayjs from 'dayjs';
 
-const INGESTION_LOCK = 'INGESTION_LOCK';
+export const INGESTION_LOCK = 'INGESTION_LOCK';
+export const LAST_READ = 'LAST_READ';
+
 export const TABLE_PK = 'pk';
 export const TABLE_SK = 'sk';
 
-async function lockIngestion(timestamp: string): Promise<boolean> {
+function getTableName() {
   // this creates a lock record in a table so that we're idempotent
   // since this will be trigger by cloudwatch events and that's often a 1+ delivery
   const tableName = process.env.TABLE_NAME;
   if (!tableName) {
     throw new Error('Please provide a TABLE_NAME to connect to for idempotency locks');
   }
+  return tableName;
+}
+
+async function lockIngestion(timestamp: number): Promise<boolean> {
+  const tableName = getTableName();
   const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
   try {
     await client.send(new PutCommand({
@@ -32,8 +40,17 @@ async function lockIngestion(timestamp: string): Promise<boolean> {
   }
 }
 
-async function readQuestions(tag: string = 'aws-cdk') {
-  const results = await axios.get(`https://api.stackexchange.com/2.3/questions/unanswered?fromdate=1659052800&order=desc&sort=activity&tagged=${tag}&site=stackoverflow`);
+async function readQuestions(tag: string = 'aws-cdk', lastReadTime: number, endTime: number) {
+  const results = await axios.get('https://api.stackexchange.com/2.3/questions/unanswered', {
+    params: {
+      fromdate: lastReadTime,
+      todate: endTime,
+      order: 'desc',
+      sort: 'activity',
+      tagged: tag,
+      site: 'stackoverflow',
+    },
+  });
   return results.data.items;
 }
 
@@ -68,14 +85,50 @@ async function unlockIngestion() {
   }));
 }
 
+async function getLastReadDate(): Promise<number> {
+  const tableName = getTableName();
+  const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+  const results = await client.send(new GetCommand({
+    TableName: tableName,
+    Key: {
+      [TABLE_PK]: LAST_READ, [TABLE_SK]: LAST_READ,
+    },
+  }));
+  const item = results.Item;
+  if (!item) {
+    // we didn't get an item, so let's come up with a date, last 24 hours?
+    return Math.round(dayjs().subtract(1, 'day').toDate().getTime() / 1000);
+  }
+  return item!.timestamp;
+}
+
+async function writeLastReadDate(startTime: number) {
+  const tableName = getTableName();
+  const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+  await client.send(new PutCommand({
+    TableName: tableName,
+    Item: { [TABLE_PK]: LAST_READ, [TABLE_SK]: LAST_READ, timestamp: startTime },
+  }));
+}
+
 export const handler = async (event: {}) => {
   console.log('Event:', JSON.stringify(event, null, 2));
-  const startTime = new Date().toISOString();
+  const startTime = Math.round(new Date().getTime() / 1000);
   if (!await lockIngestion(startTime)) {
     console.warn('Ingestion lock could not be created, probably because another process is already running. Existing ingestion.');
     return;
   }
-  const questions = await readQuestions(process.env.TAG);
-  await enqueueQuestions(questions);
-  await unlockIngestion();
+  try {
+
+    const lastReadDate = await getLastReadDate();
+    const questions = await readQuestions(process.env.TAG, lastReadDate, startTime);
+    await enqueueQuestions(questions);
+    await writeLastReadDate(startTime);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await unlockIngestion();
+  }
 };

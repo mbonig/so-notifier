@@ -1,23 +1,86 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { DeleteCommand, DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import axios from 'axios';
-import { handler } from '../../src/constructs/StackOverflowIngestion/StackOverflowIngestion.Reader';
+import dayjs from 'dayjs';
+import {
+  handler,
+  INGESTION_LOCK,
+  LAST_READ,
+  TABLE_PK,
+  TABLE_SK,
+} from '../../src/constructs/StackOverflowIngestion/StackOverflowIngestion.Reader';
 
 jest.mock('axios');
+
+expect.extend({
+  toBeAround(actual, expected, delta = 500) {
+    const pass = Math.abs(expected - actual) < delta;
+    if (pass) {
+      return {
+        message: () => `expected ${actual} not to be around ${expected}`,
+        pass: true,
+      };
+    } else {
+      return {
+        message: () => `expected ${actual} to be around ${expected}`,
+        pass: false,
+      };
+    }
+  },
+});
+
 describe('Ingestion Handler', function () {
-  let ddbMock = mockClient(DynamoDBDocumentClient);
-  let sqsMock = mockClient(SQSClient);
+  const ddbMock = mockClient(DynamoDBDocumentClient);
+  const sqsMock = mockClient(SQSClient);
+  const tableName = 'some-table';
+  const tag = 'aws-cdk';
+
   beforeEach(() => {
     ddbMock.reset();
     sqsMock.reset();
   });
   beforeAll(() => {
-    process.env.TAGS = 'aws-cdk,cdk';
-    process.env.TABLE_NAME = 'some-table';
+    process.env.TAG = tag;
+    process.env.TABLE_NAME = tableName;
     process.env.QUEUE_URL = 'somequeue';
   });
+
+  function mockPutIngestionLock() {
+    ddbMock.on(PutCommand, {
+      Item: {
+        [TABLE_PK]: INGESTION_LOCK,
+        [TABLE_SK]: INGESTION_LOCK,
+      },
+    }).resolvesOnce({});
+  }
+
+  function mockDeleteIngestionLock() {
+    ddbMock.on(DeleteCommand, {
+      Key: {
+        [TABLE_PK]: INGESTION_LOCK,
+        [TABLE_SK]: INGESTION_LOCK,
+      },
+    }).resolvesOnce({});
+  }
+
+  function mockGetLastReadTime() {
+    const date = (new Date().getTime() / 1000);
+    ddbMock.on(GetCommand, {
+      TableName: tableName,
+      Key: {
+        [TABLE_PK]: LAST_READ,
+        [TABLE_SK]: LAST_READ,
+      },
+    }).resolvesOnce({ Item: { timestamp: date } });
+    return date;
+  }
+
+  function mockAxiosRead(items: any[] = []) {
+    // @ts-ignore
+    axios.get.mockResolvedValueOnce({ data: { items } });
+  }
 
   describe('locking works', () => {
 
@@ -31,24 +94,124 @@ describe('Ingestion Handler', function () {
     });
 
     it('should call to SO if not locked', async () => {
-      ddbMock.on(PutCommand).resolvesOnce({});
-      ddbMock.on(DeleteCommand).resolvesOnce({});
-      // @ts-ignore
-      axios.get.mockResolvedValueOnce({ data: {} });
+      // when
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      mockGetLastReadTime();
+      mockAxiosRead();
+
+      // then
       await handler({});
+
+      // expect
       expect(axios.get).toHaveBeenCalled();
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
+      expect(ddbMock).toHaveReceivedCommand(GetCommand);
+
+    });
+  });
+
+  function mockLastReadTimeWrite(date: number) {
+    ddbMock.on(PutCommand, {
+      Item: {
+        [TABLE_PK]: LAST_READ,
+        [TABLE_SK]: LAST_READ,
+        timestamp: date,
+      },
+    }).resolvesOnce({});
+  }
+
+  describe('start date', () => {
+    it('start date matches last read', async () => {
+      // when
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      const date = mockGetLastReadTime();
+      mockAxiosRead();
+
+      // then
+      await handler({});
+
+      // expect
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringMatching('https://api.stackexchange.com/2.3/questions/unanswered'),
+        {
+          params: {
+            fromdate: date,
+            todate: expect.anything(),
+            order: 'desc',
+            sort: 'activity',
+            tagged: tag,
+            site: 'stackoverflow',
+          },
+        },
+      );
+    });
+
+    it('start date is one day ago when not previously run', async () => {
+      // when
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      ddbMock.on(GetCommand, {
+        TableName: tableName,
+        Key: {
+          [TABLE_PK]: LAST_READ,
+          [TABLE_SK]: LAST_READ,
+        },
+      }).resolvesOnce({ Item: undefined });
+
+      mockAxiosRead();
+
+      // then
+      await handler({});
+
+      // expect
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringMatching('https://api.stackexchange.com/2.3/questions/unanswered'),
+        {
+          params: {
+            // @ts-ignore
+            fromdate: expect.toBeAround(Math.round(dayjs().subtract(1, 'day').toDate().getTime() / 1000), 20),
+            todate: expect.anything(),
+            order: 'desc',
+            sort: 'activity',
+            tagged: tag,
+            site: 'stackoverflow',
+          },
+        },
+      );
+
+
+    });
+
+    it('writes date to table', async () => {
+      // when
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      const date = mockGetLastReadTime();
+      mockAxiosRead();
+      mockLastReadTimeWrite(date);
+
+      // then
+      await handler({});
+
+      // expect
+      expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item![TABLE_PK]).toEqual(LAST_READ);
+      expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item![TABLE_SK]).toEqual(LAST_READ);
+      expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item!.timestamp).toBeAround(Math.round(new Date().getTime() / 1000), 50);
 
     });
   });
 
   describe('enqueues', () => {
     it('write to queue', async () => {
-      ddbMock.on(PutCommand).resolvesOnce({});
-      ddbMock.on(DeleteCommand).resolvesOnce({});
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      mockGetLastReadTime();
+
       // @ts-ignore
-      axios.get.mockResolvedValueOnce({ data: { items: [{}, {}, {}] } });
+      mockAxiosRead([{}, {}, {}]);
 
       await handler({});
 
@@ -56,8 +219,6 @@ describe('Ingestion Handler', function () {
       expect(axios.get).toHaveBeenCalled();
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
-
     });
   });
-
 });

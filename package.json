@@ -51,7 +51,8 @@
     "aws-cdk-lib": "^2.34.2",
     "aws-sdk-client-mock": "*",
     "axios": "^0.27.2",
-    "constructs": "^10.0.5"
+    "constructs": "^10.0.5",
+    "dayjs": "^1.11.4"
   },
   "license": "Apache-2.0",
   "version": "0.0.0",
