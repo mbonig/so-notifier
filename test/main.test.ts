@@ -1,11 +1,11 @@
-import '@aws-cdk/assert/jest';
-import { App } from '@aws-cdk/core';
-import { MyStack } from '../src/main';
+import { App } from 'aws-cdk-lib';
+import { Template } from 'aws-cdk-lib/assertions';
+import { StackOverflowNotifierStack } from '../src/stacks/StackOverflowNotifierStack';
 
 test('Snapshot', () => {
   const app = new App();
-  const stack = new MyStack(app, 'test');
+  const stack = new StackOverflowNotifierStack(app, 'test');
 
-  expect(stack).not.toHaveResource('AWS::S3::Bucket');
-  expect(app.synth().getStackArtifact(stack.artifactId).template).toMatchSnapshot();
+  const assert = Template.fromStack(stack);
+  expect(assert.toJSON()).toMatchSnapshot();
 });
