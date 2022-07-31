@@ -80,6 +80,10 @@
       "type": "build"
     },
     {
+      "name": "@aws-sdk/client-cloudwatch",
+      "type": "runtime"
+    },
+    {
       "name": "@aws-sdk/client-dynamodb",
       "type": "runtime"
     },
@@ -89,6 +93,10 @@
     },
     {
       "name": "@aws-sdk/lib-dynamodb",
+      "type": "runtime"
+    },
+    {
+      "name": "@matthewbonig/simple-logger",
       "type": "runtime"
     },
     {
@@ -102,6 +110,10 @@
     },
     {
       "name": "axios",
+      "type": "runtime"
+    },
+    {
+      "name": "cdk-iam-floyd",
       "type": "runtime"
     },
     {

@@ -7,10 +7,13 @@ const project = new awscdk.AwsCdkTypeScriptApp({
 
   deps: [
     'axios',
+    '@aws-sdk/client-cloudwatch',
     '@aws-sdk/client-dynamodb',
     '@aws-sdk/client-sqs',
     '@aws-sdk/lib-dynamodb',
+    '@matthewbonig/simple-logger',
     'aws-sdk-client-mock',
+    'cdk-iam-floyd',
     'dayjs',
   ],
   // description: undefined,      /* The description is just a string that helps people understand the purpose of the package. */

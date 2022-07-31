@@ -1,6 +1,7 @@
 import { AttributeType, BillingMode, Table, TableEncryption } from 'aws-cdk-lib/aws-dynamodb';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Queue, QueueEncryption } from 'aws-cdk-lib/aws-sqs';
+import { Cloudwatch } from 'cdk-iam-floyd';
 import { Construct } from 'constructs';
 import { TABLE_PK, TABLE_SK } from './StackOverflowIngestion.Reader';
 
@@ -40,6 +41,8 @@ export class StackOverflowIngestion extends Construct {
     });
     table.grantReadWriteData(reader);
     queue.grantSendMessages(reader);
+
+    reader.addToRolePolicy(new Cloudwatch().allow().toPutMetricData().onAllResources());
 
   }
 }

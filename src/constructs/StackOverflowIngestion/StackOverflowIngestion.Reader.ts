@@ -1,11 +1,15 @@
+import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { useLogger } from '@matthewbonig/simple-logger';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
 export const INGESTION_LOCK = 'INGESTION_LOCK';
 export const LAST_READ = 'LAST_READ';
+export const METRIC_NAMESPACE = 'cdk.dev';
+export const QUESTION_INGESTED_METRIC_NAME = 'QuestionsIngested';
 
 export const TABLE_PK = 'pk';
 export const TABLE_SK = 'sk';
@@ -55,18 +59,32 @@ async function readQuestions(tag: string = 'aws-cdk', lastReadTime: number, endT
 }
 
 async function enqueueQuestions(questions: any[]) {
+  let totalWritten = 0;
   const queueUrl = process.env.QUEUE_URL;
   if (!queueUrl) {
     throw new Error('Please provide a QUEUE_URL for sqs');
   }
   const client = new SQSClient({});
-  for await (const question of questions) {
+  const unansweredQuestions = questions.filter(question => !question.is_answered);
+  for await (const question of unansweredQuestions) {
 
     await client.send(new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(question),
     }));
+    totalWritten++;
   }
+
+  const cloudWatchClient = new CloudWatchClient({});
+  await cloudWatchClient.send(new PutMetricDataCommand({
+    Namespace: METRIC_NAMESPACE,
+    MetricData: [
+      {
+        MetricName: QUESTION_INGESTED_METRIC_NAME,
+        Value: totalWritten,
+      },
+    ],
+  }));
 
 }
 
@@ -109,26 +127,30 @@ async function writeLastReadDate(startTime: number) {
 
   await client.send(new PutCommand({
     TableName: tableName,
-    Item: { [TABLE_PK]: LAST_READ, [TABLE_SK]: LAST_READ, timestamp: startTime },
+    Item: {
+      [TABLE_PK]: LAST_READ,
+      [TABLE_SK]: LAST_READ,
+      timestamp: startTime,
+      timestamp_iso: dayjs(startTime * 1000).toISOString(),
+    },
   }));
 }
 
 export const handler = async (event: {}) => {
   console.log('Event:', JSON.stringify(event, null, 2));
   const startTime = Math.round(new Date().getTime() / 1000);
-  if (!await lockIngestion(startTime)) {
+  if (!await useLogger(lockIngestion)(startTime)) {
     console.warn('Ingestion lock could not be created, probably because another process is already running. Existing ingestion.');
     return;
   }
   try {
-
-    const lastReadDate = await getLastReadDate();
-    const questions = await readQuestions(process.env.TAG, lastReadDate, startTime);
-    await enqueueQuestions(questions);
-    await writeLastReadDate(startTime);
+    const lastReadDate = await useLogger(getLastReadDate)();
+    const questions = await useLogger(readQuestions)(process.env.TAG, lastReadDate, startTime);
+    await useLogger(enqueueQuestions)(questions);
+    await useLogger(writeLastReadDate)(startTime);
   } catch (err) {
     console.error(err);
   } finally {
-    await unlockIngestion();
+    await useLogger(unlockIngestion)();
   }
 };

@@ -1,3 +1,4 @@
+import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
@@ -8,6 +9,8 @@ import {
   handler,
   INGESTION_LOCK,
   LAST_READ,
+  METRIC_NAMESPACE,
+  QUESTION_INGESTED_METRIC_NAME,
   TABLE_PK,
   TABLE_SK,
 } from '../../src/constructs/StackOverflowIngestion/StackOverflowIngestion.Reader';
@@ -34,12 +37,14 @@ expect.extend({
 describe('Ingestion Handler', function () {
   const ddbMock = mockClient(DynamoDBDocumentClient);
   const sqsMock = mockClient(SQSClient);
+  const cloudWatchMock = mockClient(CloudWatchClient);
   const tableName = 'some-table';
   const tag = 'aws-cdk';
 
   beforeEach(() => {
     ddbMock.reset();
     sqsMock.reset();
+    cloudWatchMock.reset();
   });
   beforeAll(() => {
     process.env.TAG = tag;
@@ -199,7 +204,12 @@ describe('Ingestion Handler', function () {
       // expect
       expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item![TABLE_PK]).toEqual(LAST_READ);
       expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item![TABLE_SK]).toEqual(LAST_READ);
-      expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item!.timestamp).toBeAround(Math.round(new Date().getTime() / 1000), 50);
+      let now = new Date();
+      expect(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item!.timestamp).toBeAround(Math.round(now.getTime() / 1000), 50);
+
+      // I don't care if the individual second is correct.
+      const replaceSeconds = (isoString: string) => isoString.replace(/\d\./, '0');
+      expect(replaceSeconds(ddbMock.commandCalls(PutCommand)[1].args[0].input.Item!.timestamp_iso)).toEqual(replaceSeconds(now.toISOString().replace(/\.\d{3}/, '.000')));
 
     });
   });
@@ -219,6 +229,45 @@ describe('Ingestion Handler', function () {
       expect(axios.get).toHaveBeenCalled();
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
+    });
+
+    it('doesnt send answered', async () => {
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      mockGetLastReadTime();
+
+      // @ts-ignore
+      mockAxiosRead([{}, {}, { is_answered: true }]);
+
+      await handler({});
+
+      expect(sqsMock).toHaveReceivedCommandTimes(SendMessageCommand, 2);
+      expect(axios.get).toHaveBeenCalled();
+      expect(ddbMock).toHaveReceivedCommand(PutCommand);
+      expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
+    });
+  });
+
+  describe('writes custom metric data', function () {
+    it('should write one metric value per question published', async () => {
+
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      mockGetLastReadTime();
+      mockAxiosRead([{ is_answered: true }, {}, {}]);
+      cloudWatchMock.on(PutMetricDataCommand).resolvesOnce({});
+
+      await handler({});
+
+      expect(cloudWatchMock).toHaveReceivedCommandWith(PutMetricDataCommand, {
+        Namespace: METRIC_NAMESPACE,
+        MetricData: [{
+          MetricName: QUESTION_INGESTED_METRIC_NAME,
+          Value: 2,
+          Dimensions: [],
+        }],
+      });
+
     });
   });
 });
