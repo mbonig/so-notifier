@@ -4,21 +4,18 @@ const project = new awscdk.AwsCdkTypeScriptApp({
   defaultReleaseBranch: 'main',
   name: 'so-notifier',
   projenrcTs: true,
-
   deps: [
     'axios',
     '@aws-sdk/client-cloudwatch',
     '@aws-sdk/client-dynamodb',
     '@aws-sdk/client-sqs',
+    '@aws-sdk/client-secrets-manager',
     '@aws-sdk/lib-dynamodb',
     '@matthewbonig/simple-logger',
+    '@types/aws-lambda',
     'aws-sdk-client-mock',
     'cdk-iam-floyd',
     'dayjs',
   ],
-  // description: undefined,      /* The description is just a string that helps people understand the purpose of the package. */
-  // devDeps: [],                 /* Build dependencies for this module. */
-  // packageName: undefined,      /* The "name" in package.json. */
-  // release: undefined,          /* Add release management to this project. */
 });
 project.synth();

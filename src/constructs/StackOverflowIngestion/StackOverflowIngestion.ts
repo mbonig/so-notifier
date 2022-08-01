@@ -1,4 +1,8 @@
+import { Duration } from 'aws-cdk-lib';
 import { AttributeType, BillingMode, Table, TableEncryption } from 'aws-cdk-lib/aws-dynamodb';
+
+import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Queue, QueueEncryption } from 'aws-cdk-lib/aws-sqs';
 import { Cloudwatch } from 'cdk-iam-floyd';
@@ -10,6 +14,7 @@ export interface StackOverflowIngestionProps {
 }
 
 export class StackOverflowIngestion extends Construct {
+  public queue: Queue;
   constructor(scope: Construct, id: string, props: StackOverflowIngestionProps) {
     super(scope, id);
 
@@ -28,7 +33,7 @@ export class StackOverflowIngestion extends Construct {
       },
     });
 
-    const queue = new Queue(this, 'Queue', {
+    const queue = this.queue = new Queue(this, 'Queue', {
       encryption: QueueEncryption.KMS,
 
     });
@@ -43,6 +48,11 @@ export class StackOverflowIngestion extends Construct {
     queue.grantSendMessages(reader);
 
     reader.addToRolePolicy(new Cloudwatch().allow().toPutMetricData().onAllResources());
+
+    const everyHour = new Rule(this, 'Timer', {
+      schedule: Schedule.rate(Duration.hours(1)),
+    });
+    everyHour.addTarget(new LambdaFunction(reader));
 
   }
 }

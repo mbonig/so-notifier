@@ -88,6 +88,10 @@
       "type": "runtime"
     },
     {
+      "name": "@aws-sdk/client-secrets-manager",
+      "type": "runtime"
+    },
+    {
       "name": "@aws-sdk/client-sqs",
       "type": "runtime"
     },
@@ -97,6 +101,10 @@
     },
     {
       "name": "@matthewbonig/simple-logger",
+      "type": "runtime"
+    },
+    {
+      "name": "@types/aws-lambda",
       "type": "runtime"
     },
     {
