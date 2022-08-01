@@ -264,7 +264,6 @@ describe('Ingestion Handler', function () {
         MetricData: [{
           MetricName: QUESTION_INGESTED_METRIC_NAME,
           Value: 2,
-          Dimensions: [],
         }],
       });
 

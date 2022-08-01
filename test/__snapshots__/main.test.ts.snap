@@ -10,8 +10,58 @@ Object {
     },
   },
   "Resources": Object {
+    "IngestionQueue8DED9A6F": Object {
+      "DeletionPolicy": "Delete",
+      "Properties": Object {
+        "KmsMasterKeyId": Object {
+          "Fn::GetAtt": Array [
+            "IngestionQueueKey11AC9CC2",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "IngestionQueueKey11AC9CC2": Object {
+      "DeletionPolicy": "Retain",
+      "Properties": Object {
+        "Description": "Created by test/Ingestion/Queue",
+        "KeyPolicy": Object {
+          "Statement": Array [
+            Object {
+              "Action": "kms:*",
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      "arn:",
+                      Object {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      Object {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+              },
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+      },
+      "Type": "AWS::KMS::Key",
+      "UpdateReplacePolicy": "Retain",
+    },
     "IngestionReader9D51DF6E": Object {
       "DependsOn": Array [
+        "IngestionReaderServiceRoleDefaultPolicy57024BE4",
         "IngestionReaderServiceRoleA7C758B2",
       ],
       "Properties": Object {
@@ -19,12 +69,18 @@ Object {
           "S3Bucket": Object {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "42bba182bbc6eda871181cff900603ad582aa90da994f2672df9ee79684feb8c.zip",
+          "S3Key": "02c3012e26c26b0083a0b56dc51720164d8402c74995f1095c5e85e2c794f564.zip",
         },
         "Environment": Object {
           "Variables": Object {
             "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
-            "TAGS": "aws-cdk",
+            "QUEUE_URL": Object {
+              "Ref": "IngestionQueue8DED9A6F",
+            },
+            "TABLE_NAME": Object {
+              "Ref": "IngestionTable871E5FCB",
+            },
+            "TAG": "aws-cdk",
           },
         },
         "Handler": "index.handler",
@@ -68,6 +124,291 @@ Object {
         ],
       },
       "Type": "AWS::IAM::Role",
+    },
+    "IngestionReaderServiceRoleDefaultPolicy57024BE4": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": Array [
+                "dynamodb:BatchGetItem",
+                "dynamodb:GetRecords",
+                "dynamodb:GetShardIterator",
+                "dynamodb:Query",
+                "dynamodb:GetItem",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
+              ],
+              "Effect": "Allow",
+              "Resource": Array [
+                Object {
+                  "Fn::GetAtt": Array [
+                    "IngestionTable871E5FCB",
+                    "Arn",
+                  ],
+                },
+                Object {
+                  "Ref": "AWS::NoValue",
+                },
+              ],
+            },
+            Object {
+              "Action": Array [
+                "sqs:SendMessage",
+                "sqs:GetQueueAttributes",
+                "sqs:GetQueueUrl",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "IngestionQueue8DED9A6F",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": Array [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "IngestionQueueKey11AC9CC2",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": "cloudwatch:PutMetricData",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "IngestionReaderServiceRoleDefaultPolicy57024BE4",
+        "Roles": Array [
+          Object {
+            "Ref": "IngestionReaderServiceRoleA7C758B2",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "IngestionTable871E5FCB": Object {
+      "DeletionPolicy": "Retain",
+      "Properties": Object {
+        "AttributeDefinitions": Array [
+          Object {
+            "AttributeName": "pk",
+            "AttributeType": "S",
+          },
+          Object {
+            "AttributeName": "sk",
+            "AttributeType": "S",
+          },
+        ],
+        "KeySchema": Array [
+          Object {
+            "AttributeName": "pk",
+            "KeyType": "HASH",
+          },
+          Object {
+            "AttributeName": "sk",
+            "KeyType": "RANGE",
+          },
+        ],
+        "ProvisionedThroughput": Object {
+          "ReadCapacityUnits": 1,
+          "WriteCapacityUnits": 1,
+        },
+        "SSESpecification": Object {
+          "SSEEnabled": true,
+        },
+      },
+      "Type": "AWS::DynamoDB::Table",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "IngestionTimer06B2192B": Object {
+      "Properties": Object {
+        "ScheduleExpression": "rate(1 hour)",
+        "State": "ENABLED",
+        "Targets": Array [
+          Object {
+            "Arn": Object {
+              "Fn::GetAtt": Array [
+                "IngestionReader9D51DF6E",
+                "Arn",
+              ],
+            },
+            "Id": "Target0",
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "IngestionTimerAllowEventRuletestIngestionReaderE85444C0E0C29024": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "IngestionReader9D51DF6E",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::GetAtt": Array [
+            "IngestionTimer06B2192B",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "Notifier7BE3979E": Object {
+      "DependsOn": Array [
+        "NotifierServiceRoleDefaultPolicyA96EB3C8",
+        "NotifierServiceRole59AC675D",
+      ],
+      "Properties": Object {
+        "Code": Object {
+          "S3Bucket": Object {
+            "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
+          },
+          "S3Key": "c7ca8f6c8007ab57fe71ab71945c136a8bb86b1c22d555f10dda9c36123bed31.zip",
+        },
+        "Environment": Object {
+          "Variables": Object {
+            "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
+            "SLACK_WEBHOOK_SECRET": Object {
+              "Ref": "NotifierSlackWebhook13B7B021",
+            },
+          },
+        },
+        "Handler": "index.handler",
+        "Role": Object {
+          "Fn::GetAtt": Array [
+            "NotifierServiceRole59AC675D",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs14.x",
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "NotifierServiceRole59AC675D": Object {
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": Array [
+          Object {
+            "Fn::Join": Array [
+              "",
+              Array [
+                "arn:",
+                Object {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "NotifierServiceRoleDefaultPolicyA96EB3C8": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": Array [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Ref": "NotifierSlackWebhook13B7B021",
+              },
+            },
+            Object {
+              "Action": Array [
+                "sqs:ReceiveMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueUrl",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "IngestionQueue8DED9A6F",
+                  "Arn",
+                ],
+              },
+            },
+            Object {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "IngestionQueueKey11AC9CC2",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "NotifierServiceRoleDefaultPolicyA96EB3C8",
+        "Roles": Array [
+          Object {
+            "Ref": "NotifierServiceRole59AC675D",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "NotifierSlackWebhook13B7B021": Object {
+      "DeletionPolicy": "Delete",
+      "Properties": Object {
+        "GenerateSecretString": Object {},
+      },
+      "Type": "AWS::SecretsManager::Secret",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "NotifierSqsEventSourcetestIngestionQueue80F6FE84D6E37AB3": Object {
+      "Properties": Object {
+        "EventSourceArn": Object {
+          "Fn::GetAtt": Array [
+            "IngestionQueue8DED9A6F",
+            "Arn",
+          ],
+        },
+        "FunctionName": Object {
+          "Ref": "Notifier7BE3979E",
+        },
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
     },
   },
   "Rules": Object {
