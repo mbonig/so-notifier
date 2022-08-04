@@ -266,7 +266,6 @@ describe('Ingestion Handler', function () {
           Value: 2,
         }],
       });
-
     });
   });
 });
