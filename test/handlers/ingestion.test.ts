@@ -4,6 +4,7 @@ import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import axios from 'axios';
+// @ts-ignore
 import dayjs from 'dayjs';
 import {
   handler,
@@ -225,7 +226,7 @@ describe('Ingestion Handler', function () {
 
       await handler({});
 
-      expect(sqsMock).toHaveReceivedCommandTimes(SendMessageCommand, 3);
+      expect(sqsMock).toHaveReceivedCommandTimes(SendMessageCommand, 1);
       expect(axios.get).toHaveBeenCalled();
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
@@ -241,7 +242,9 @@ describe('Ingestion Handler', function () {
 
       await handler({});
 
-      expect(sqsMock).toHaveReceivedCommandTimes(SendMessageCommand, 2);
+      expect(sqsMock).toHaveReceivedCommandWith(SendMessageCommand, {
+        MessageBody: JSON.stringify([{}, {}]),
+      });
       expect(axios.get).toHaveBeenCalled();
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);

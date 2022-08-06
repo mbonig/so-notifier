@@ -17,15 +17,18 @@ export const handler = async(event: SQSEvent)=>{
 
   const webhookUrl = await getWebhookUrl();
 
-  for await (const question of event.Records.map(record=>JSON.parse(record.body))) {
-    console.log('question: ', JSON.stringify(question, null, 2));
+  for await (const questions of event.Records.map(record=>JSON.parse(record.body))) {
+
+    console.log('question: ', JSON.stringify(questions, null, 2));
+    const questionLinks = questions.map((question: {link: string; title: string})=>`<${question.link}|${question.title}>`).join('\n');
+
     await axios.post(webhookUrl, {
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `A new question was asked on StackOverflow, can you answer it?\n<${question.link}|${question.title}>`,
+            text: `New questions were asked on StackOverflow, can you answer them?\n${questionLinks}`,
           },
         },
       ],

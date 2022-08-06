@@ -59,21 +59,17 @@ async function readQuestions(tag: string = 'aws-cdk', lastReadTime: number, endT
 }
 
 async function enqueueQuestions(questions: any[]) {
-  let totalWritten = 0;
   const queueUrl = process.env.QUEUE_URL;
   if (!queueUrl) {
     throw new Error('Please provide a QUEUE_URL for sqs');
   }
   const client = new SQSClient({});
   const unansweredQuestions = questions.filter(question => !question.is_answered);
-  for await (const question of unansweredQuestions) {
 
-    await client.send(new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify(question),
-    }));
-    totalWritten++;
-  }
+  await client.send(new SendMessageCommand({
+    QueueUrl: queueUrl,
+    MessageBody: JSON.stringify(unansweredQuestions),
+  }));
 
   const cloudWatchClient = new CloudWatchClient({});
   await cloudWatchClient.send(new PutMetricDataCommand({
@@ -81,7 +77,7 @@ async function enqueueQuestions(questions: any[]) {
     MetricData: [
       {
         MetricName: QUESTION_INGESTED_METRIC_NAME,
-        Value: totalWritten,
+        Value: unansweredQuestions.length,
       },
     ],
   }));

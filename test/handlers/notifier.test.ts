@@ -10,7 +10,9 @@ describe('Notifier handler', () => {
   const smMock = mockClient(SecretsManagerClient);
   const TEST_SECRET_STRING = 'https://somelongslackwebhookurl';
   const SOME_TITLE = 'sometitle';
+  const SOME_TITLE_2 = 'sometitle2';
   const SOME_LINK = 'https://somelink';
+  const SOME_LINK_2 = 'https://somelink2';
 
   beforeEach(() => {
     smMock.reset();
@@ -23,7 +25,10 @@ describe('Notifier handler', () => {
     return <SQSEvent>{
       Records: [
         {
-          body: JSON.stringify({ title: SOME_TITLE, link: SOME_LINK }),
+          body: JSON.stringify([
+            { title: SOME_TITLE, link: SOME_LINK },
+            { title: SOME_TITLE_2, link: SOME_LINK_2 },
+          ]),
         },
       ],
     };
@@ -51,7 +56,7 @@ describe('Notifier handler', () => {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `A new question was asked on StackOverflow, can you answer it?\n<${SOME_LINK}|${SOME_TITLE}>`,
+            text: `New questions were asked on StackOverflow, can you answer them?\n<${SOME_LINK}|${SOME_TITLE}>\n<${SOME_LINK_2}|${SOME_TITLE_2}>`,
           },
         },
       ],
