@@ -69,7 +69,7 @@ Object {
           "S3Bucket": Object {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "02c3012e26c26b0083a0b56dc51720164d8402c74995f1095c5e85e2c794f564.zip",
+          "S3Key": "8e565a40800c28fddecf5890978dfd987570018bdbca70991a8f8aff28ec4b54.zip",
         },
         "Environment": Object {
           "Variables": Object {
@@ -239,7 +239,7 @@ Object {
     },
     "IngestionTimer06B2192B": Object {
       "Properties": Object {
-        "ScheduleExpression": "rate(1 hour)",
+        "ScheduleExpression": "rate(1 day)",
         "State": "ENABLED",
         "Targets": Array [
           Object {
@@ -284,7 +284,7 @@ Object {
           "S3Bucket": Object {
             "Fn::Sub": "cdk-hnb659fds-assets-\${AWS::AccountId}-\${AWS::Region}",
           },
-          "S3Key": "c7ca8f6c8007ab57fe71ab71945c136a8bb86b1c22d555f10dda9c36123bed31.zip",
+          "S3Key": "1785e033e7443760707fa27471b153dc9f4d6aeddc80f95d86e07cb77d78e6da.zip",
         },
         "Environment": Object {
           "Variables": Object {

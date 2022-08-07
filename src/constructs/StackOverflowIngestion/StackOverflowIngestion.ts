@@ -50,7 +50,7 @@ export class StackOverflowIngestion extends Construct {
     reader.addToRolePolicy(new Cloudwatch().allow().toPutMetricData().onAllResources());
 
     const everyHour = new Rule(this, 'Timer', {
-      schedule: Schedule.rate(Duration.hours(1)),
+      schedule: Schedule.rate(Duration.days(1)),
     });
     everyHour.addTarget(new LambdaFunction(reader));
 
