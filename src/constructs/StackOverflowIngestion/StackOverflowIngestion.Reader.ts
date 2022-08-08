@@ -66,10 +66,12 @@ async function enqueueQuestions(questions: any[]) {
   const client = new SQSClient({});
   const unansweredQuestions = questions.filter(question => !question.is_answered);
 
-  await client.send(new SendMessageCommand({
-    QueueUrl: queueUrl,
-    MessageBody: JSON.stringify(unansweredQuestions),
-  }));
+  if (unansweredQuestions.length > 0) {
+    await client.send(new SendMessageCommand({
+      QueueUrl: queueUrl,
+      MessageBody: JSON.stringify(unansweredQuestions),
+    }));
+  }
 
   const cloudWatchClient = new CloudWatchClient({});
   await cloudWatchClient.send(new PutMetricDataCommand({
