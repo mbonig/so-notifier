@@ -249,6 +249,20 @@ describe('Ingestion Handler', function () {
       expect(ddbMock).toHaveReceivedCommand(PutCommand);
       expect(ddbMock).toHaveReceivedCommand(DeleteCommand);
     });
+
+    it('doesnt send empty messages', async ()=>{
+      mockPutIngestionLock();
+      mockDeleteIngestionLock();
+      mockGetLastReadTime();
+
+      // @ts-ignore
+      mockAxiosRead([]);
+
+      await handler({});
+
+      expect(sqsMock).not.toHaveReceivedCommand(SendMessageCommand);
+
+    });
   });
 
   describe('writes custom metric data', function () {
