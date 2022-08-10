@@ -1,4 +1,4 @@
-const { awscdk } = require('projen');
+import { awscdk } from 'projen';
 const project = new awscdk.AwsCdkTypeScriptApp({
   cdkVersion: '2.34.2',
   defaultReleaseBranch: 'main',
@@ -13,6 +13,7 @@ const project = new awscdk.AwsCdkTypeScriptApp({
     '@aws-sdk/lib-dynamodb',
     '@matthewbonig/simple-logger',
     '@types/aws-lambda',
+    '@types/node',
     'aws-sdk-client-mock',
     'cdk-iam-floyd',
     'dayjs',
