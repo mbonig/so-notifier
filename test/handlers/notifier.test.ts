@@ -1,8 +1,14 @@
-import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
+import {
+  GetSecretValueCommand,
+  SecretsManagerClient,
+} from '@aws-sdk/client-secrets-manager';
 import { SQSEvent } from 'aws-lambda';
 import { mockClient } from 'aws-sdk-client-mock';
 import axios from 'axios';
-import { handler, SECRET_KEY } from '../../src/constructs/SlackNotifier/SlackNotifier.Notifier';
+import {
+  handler,
+  SECRET_KEY,
+} from '../../src/constructs/SlackNotifier/SlackNotifier.Notifier';
 
 jest.mock('axios');
 
@@ -40,11 +46,12 @@ describe('Notifier handler', () => {
   }
 
   function mockSecretRead() {
-    const date = (new Date().getTime() / 1000);
-    smMock.on(GetSecretValueCommand).resolvesOnce({ $metadata: {}, SecretString: TEST_SECRET_STRING });
+    const date = new Date().getTime() / 1000;
+    smMock
+      .on(GetSecretValueCommand)
+      .resolvesOnce({ $metadata: {}, SecretString: TEST_SECRET_STRING });
     return date;
   }
-
 
   it('writes to slack', async () => {
     mockSecretRead();
@@ -53,16 +60,27 @@ describe('Notifier handler', () => {
     expect(axios.post).toHaveBeenCalledWith(TEST_SECRET_STRING, {
       blocks: [
         {
-          type: 'section',
+          type: 'header',
           text: {
-            type: 'mrkdwn',
-            text: `New questions were asked on StackOverflow, can you answer them?\n<${SOME_LINK}|${SOME_TITLE}>\n<${SOME_LINK_2}|${SOME_TITLE_2}>`,
+            type: 'plain_text',
+            text: 'Unanswered CDK questions on Stack Overflow',
+            emoji: true,
           },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: 'Can you help answer them?' },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: '<https://somelink|sometitle>' },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: '<https://somelink2|sometitle2>' },
         },
       ],
     });
     expect(smMock).toHaveReceivedCommand(GetSecretValueCommand);
-
   });
 });
-
