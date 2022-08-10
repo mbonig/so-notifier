@@ -17,12 +17,12 @@ async function getWebhookUrl(): Promise<string> {
   return results.SecretString!;
 }
 
-function formatQuestionEntry(question: { link: string; title: string }) {
+function formatQuestionEntry(question: { link: string; title: string }): any {
   return {
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: '<${question.link}|${question.title}>',
+      text: '<' + question.link + '|' + question.title + '>',
     },
   };
 }
@@ -58,10 +58,7 @@ export const handler = async (event: SQSEvent) => {
     ];
 
     await axios.post(webhookUrl, {
-      blocks: [
-        ...headers,
-        ...questionLinks,
-      ],
+      blocks: [...headers, ...questionLinks],
     });
   }
 };
