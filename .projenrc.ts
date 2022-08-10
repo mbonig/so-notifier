@@ -13,7 +13,6 @@ const project = new awscdk.AwsCdkTypeScriptApp({
     '@aws-sdk/lib-dynamodb',
     '@matthewbonig/simple-logger',
     '@types/aws-lambda',
-    '@types/node',
     'aws-sdk-client-mock',
     'cdk-iam-floyd',
     'dayjs',

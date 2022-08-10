@@ -108,10 +108,6 @@
       "type": "runtime"
     },
     {
-      "name": "@types/node",
-      "type": "runtime"
-    },
-    {
       "name": "aws-cdk-lib",
       "version": "^2.34.2",
       "type": "runtime"
