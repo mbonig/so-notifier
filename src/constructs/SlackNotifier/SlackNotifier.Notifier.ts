@@ -67,14 +67,11 @@ function createSlackBlockkitResponse(questions: Questions) {
 
 export const handler = async (event: SQSEvent) => {
   console.log('Event:', JSON.stringify(event, null, 2));
-
   const webhookUrl = getWebhookUrl();
-
   for await (const questions of event.Records.map((record) =>
     JSON.parse(record.body),
   )) {
     console.log('question: ', JSON.stringify(questions, null, 2));
-
     const slackPayload = createSlackBlockkitResponse(questions);
     await axios.post(await webhookUrl, slackPayload);
   }
