@@ -15,7 +15,7 @@ jest.mock('axios');
 describe('Notifier handler', () => {
   const smMock = mockClient(SecretsManagerClient);
   const TEST_SECRET_STRING = 'https://somelongslackwebhookurl';
-  const SOME_TITLE = 'sometitle';
+  const SOME_TITLE = 'sometitle &#39; &amp; &lt; &gt;';
   const SOME_TITLE_2 = 'sometitle2';
   const SOME_LINK = 'https://somelink';
   const SOME_LINK_2 = 'https://somelink2';
@@ -73,7 +73,7 @@ describe('Notifier handler', () => {
         },
         {
           type: 'section',
-          text: { type: 'mrkdwn', text: '<https://somelink|sometitle>' },
+          text: { type: 'mrkdwn', text: "<https://somelink|sometitle ' &amp; &lt; &gt;>" },
         },
         {
           type: 'section',

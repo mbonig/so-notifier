@@ -16,6 +16,7 @@ const project = new awscdk.AwsCdkTypeScriptApp({
     'aws-sdk-client-mock',
     'cdk-iam-floyd',
     'dayjs',
+    'html-entities',
   ],
 });
 project.synth();
