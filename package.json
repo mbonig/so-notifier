@@ -57,7 +57,8 @@
     "axios": "^0.27.2",
     "cdk-iam-floyd": "^0.405.0",
     "constructs": "^10.0.5",
-    "dayjs": "^1.11.4"
+    "dayjs": "^1.11.4",
+    "html-entities": "^2.3.3"
   },
   "license": "Apache-2.0",
   "version": "0.0.0",
