@@ -18,10 +18,20 @@ async function getWebhookUrl(): Promise<string> {
   return results.SecretString!;
 }
 
-function createSlackBlockkitResponse(questions: any[]) {
-  function formatQuestionEntry(question: { link: string; title: string }): any {
+interface Question {
+  link: string;
+  title: string;
+}
+
+interface Questions extends Array<Question> {}
+
+function createSlackBlockkitResponse(questions: Questions) {
+  function formatQuestionEntry(question: Question): any {
     const decodedTitle = decode(question.title);
-    const slackEncodedTitle = decodedTitle.replace(/\&/g, '&amp;').replace(/\>/g, '&gt;').replace(/</g, '&lt;');
+    const slackEncodedTitle = decodedTitle
+      .replace(/\&/g, '&amp;')
+      .replace(/\>/g, '&gt;')
+      .replace(/</g, '&lt;');
     return {
       type: 'section',
       text: {
