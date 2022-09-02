@@ -13,5 +13,15 @@ export class StackOverflowNotifierStack extends Stack {
     new SlackNotifier(this, 'Notifier', {
       queue: ingestion.queue,
     });
+
+
+    const ingestionTf = new StackOverflowIngestion(this, 'IngestionForTF', {
+      tag: 'cdktf',
+    });
+    new SlackNotifier(this, 'NotifierTf', {
+      queue: ingestionTf.queue,
+    });
+
+
   }
 }
